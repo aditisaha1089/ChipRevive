@@ -1,4 +1,42 @@
-# Semiconductor Image Restoration — DA-JRN
+# ChipRevive — DA-JRN: AI-Based Restoration of Degraded Semiconductor Images
+
+**Team: ChipRevive** | KLA Semicon Hackathon
+
+## Quick Start (Submission)
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Run inference
+python run.py INPUT_DIR OUTPUT_DIR
+```
+
+**That's it.** No config editing, no internet, no GPU required (auto-detected).
+
+- `INPUT_DIR` — folder containing degraded `.npy` files (128×128 grayscale)
+- `OUTPUT_DIR` — created automatically; restored `.npy` files saved here (256×256)
+
+### Example
+```bash
+python run.py data/test/NoisyLR restored_outputs/
+```
+
+### Submission Folder Structure
+```
+ChipRevive/
+├── run.py              ← Entry point: python run.py INPUT_DIR OUTPUT_DIR
+├── requirements.txt    ← All dependencies with versions
+├── README.md           ← This file
+├── models/
+│   └── best_model.pth  ← Trained weights (164,276 params, ~2 MB)
+└── src/
+    ├── model.py        ← DA-JRN architecture
+    ├── losses.py       ← Composite loss
+    └── utils.py        ← Utilities
+```
+
+---
 
 **Degradation-Aware Joint Restoration Network** for restoring degraded grayscale
 semiconductor inspection images (SEM/optical inspection).  
