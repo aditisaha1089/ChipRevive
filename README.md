@@ -70,8 +70,8 @@ Input NoisyLR (128×128)
 
 ```bash
 # 1. Clone
-git clone https://github.com/aditisaha1089/Semiconductor-Image-Restoration.git
-cd semiconductor-image-restoration
+git clone https://github.com/aditisaha1089/ChipRevive.git
+cd ChipRevive
 
 # 2. Create environment (Python 3.9+)
 python -m venv .venv

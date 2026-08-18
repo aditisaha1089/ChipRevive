@@ -251,7 +251,7 @@ def main():
 
     # Model
     model   = build_model(cfg).to(device)
-    loss_fn = build_loss(cfg)
+    loss_fn = build_loss(cfg).to(device)   # move Sobel/SSIM kernel buffers to GPU
 
     total_params = sum(p.numel() for p in model.parameters())
     logger.info(f"Model parameters: {total_params:,}")
