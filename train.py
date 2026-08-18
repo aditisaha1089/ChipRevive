@@ -22,6 +22,7 @@ import csv
 import os
 import sys
 import time
+import traceback
 from pathlib import Path
 
 import torch
@@ -116,21 +117,47 @@ def train_one_epoch(
 
         optimizer.zero_grad(set_to_none=True)
 
-        if use_amp:
-            with autocast(device_type="cuda"):
+        # ------------------------------------------------------------------ #
+        # Defensive wrapper on the very first batch so we always get a
+        # full traceback in train.log if something explodes on GPU.
+        # After batch 0 completes cleanly we drop the try/except overhead.
+        # ------------------------------------------------------------------ #
+        def _run_step():
+            if use_amp:
+                with autocast(device_type="cuda"):
+                    restored = model(degraded)
+                    total_loss, comps = loss_fn(restored, clean, return_components=True)
+                scaler.scale(total_loss).backward()
+                scaler.unscale_(optimizer)
+                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
                 restored = model(degraded)
                 total_loss, comps = loss_fn(restored, clean, return_components=True)
-            scaler.scale(total_loss).backward()
-            scaler.unscale_(optimizer)
-            nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            scaler.step(optimizer)
-            scaler.update()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                optimizer.step()
+            return total_loss, comps
+
+        if batch_idx == 0:
+            try:
+                total_loss, comps = _run_step()
+            except Exception:
+                tb_str = traceback.format_exc()
+                err_msg = (
+                    f"\n{'='*70}\n"
+                    f"TRAINING CRASHED on epoch {epoch}, batch 0\n"
+                    f"{'='*70}\n"
+                    f"{tb_str}"
+                    f"{'='*70}\n"
+                )
+                # Write to both stderr and the log file immediately
+                print(err_msg, file=sys.stderr, flush=True)
+                logger.error(err_msg)
+                raise  # re-raise so the caller also sees it
         else:
-            restored = model(degraded)
-            total_loss, comps = loss_fn(restored, clean, return_components=True)
-            total_loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            optimizer.step()
+            total_loss, comps = _run_step()
 
         B = degraded.size(0)
         for k, v in comps.items():
@@ -337,4 +364,20 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        tb_str = traceback.format_exc()
+        # Best-effort: write to stderr so Colab always shows it even if the
+        # logger hasn't been initialised yet.
+        print("\nFATAL: training aborted with unhandled exception:\n",
+              tb_str, file=sys.stderr, flush=True)
+        # Also try to append to train.log if it exists already
+        _log = Path("weights") / "train.log"
+        try:
+            _log.parent.mkdir(parents=True, exist_ok=True)
+            with _log.open("a") as _f:
+                _f.write(f"\nFATAL EXCEPTION:\n{tb_str}\n")
+        except Exception:
+            pass  # nothing more we can do
+        sys.exit(1)

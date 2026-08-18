@@ -101,6 +101,10 @@ class SobelGradientLoss(nn.Module):
     def gradient_magnitude(self, x: torch.Tensor) -> torch.Tensor:
         """Compute spatial gradient magnitude via Sobel filtering."""
         # x: (B, 1, H, W) — single channel grayscale
+        # NOTE: Under AMP/autocast the input may be float16, but F.conv2d with
+        # a float32 kernel on a float16 input raises a dtype mismatch on CUDA.
+        # Cast to float32 here so Sobel conv always runs in float32.
+        x = x.float()
         gx = F.conv2d(x, self.sobel_x, padding=1)  # (B, 1, H, W)
         gy = F.conv2d(x, self.sobel_y, padding=1)  # (B, 1, H, W)
         mag = torch.sqrt(gx ** 2 + gy ** 2 + self.eps ** 2)
@@ -142,6 +146,14 @@ class FFTLoss(nn.Module):
         if pred.shape != target.shape:
             pred = F.interpolate(pred, size=target.shape[-2:],
                                  mode='bilinear', align_corners=False)
+
+        # CRITICAL AMP FIX: torch.fft.fft2 does NOT support float16 on CUDA.
+        # Under torch.cuda.amp.autocast the inputs may be float16, causing:
+        #   RuntimeError: "fft_cuda" not implemented for 'Half'
+        # Cast to float32 before FFT; the scalar loss result is float32, which
+        # is fine — autocast only requires model outputs, not loss values.
+        pred   = pred.float()
+        target = target.float()
 
         # Compute 2D FFT for both images
         # torch.fft.fft2 returns complex tensor; we use magnitude spectrum
@@ -194,6 +206,11 @@ class SSIMLoss(nn.Module):
         if pred.shape != target.shape:
             pred = F.interpolate(pred, size=target.shape[-2:],
                                  mode='bilinear', align_corners=False)
+
+        # AMP FIX: The Gaussian kernel buffer is float32. Under autocast, pred/target
+        # may be float16, causing F.conv2d dtype mismatch on CUDA. Cast to float32.
+        pred   = pred.float()
+        target = target.float()
 
         pad = self.window_size // 2
         kernel = self.kernel  # already a buffer
