@@ -1,0 +1,56 @@
+# config.yaml — DA-JRN Training Configuration
+# All paths are relative to the project root.
+# Edit this file to change hyperparameters; code reads it via src/utils.py:load_config()
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data:
+  lr_dir:      "data/raw/NoisyLR"   # 3200 paired NoisyLR .npy files (128×128)
+  gt_dir:      "data/raw/GT"        # 3200 paired GT .npy files (256×256)
+  test_dir:    "data/test/NoisyLR"  # 400 test files (no GT)
+  crop_size:   128                  # GT patch size; LR patch = crop_size // 2 = 64
+  val_ratio:   0.15                 # 15% of training pairs used for validation
+  num_workers: 4                    # DataLoader workers (set 0 on Windows if issues)
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+model:
+  in_ch:      1      # Grayscale input
+  base_ch:    32     # Channel width of restoration backbone
+  embed_dim:  64     # Degradation estimator embedding dimension
+  num_blocks: 8      # NAFNet restoration blocks (6–8 recommended)
+  sr_scale:   2      # PixelShuffle upscale factor (128→256 for real data)
+  do_sr:      true   # Enable SR head (required for real dataset)
+
+# ── Loss ──────────────────────────────────────────────────────────────────────
+loss:
+  w_charb:   1.0     # Charbonnier (robust L1) — primary reconstruction
+  w_sobel:   0.5     # Sobel gradient — edge/defect preservation
+  w_fft:     0.1     # FFT frequency — high-frequency detail recovery
+  w_ssim:    0.3     # SSIM — structural fidelity
+  charb_eps: 0.001   # Charbonnier epsilon for smooth gradient near zero
+
+# ── Training ──────────────────────────────────────────────────────────────────
+training:
+  epochs:        100
+  batch_size:    8
+  lr:            2.0e-4           # Initial learning rate (Adam)
+  lr_min:        1.0e-6           # Cosine annealing minimum LR
+  weight_decay:  1.0e-4
+  grad_clip:     1.0              # Gradient norm clipping
+  seed:          42
+  amp:           true             # Mixed precision (set false if no CUDA)
+  log_interval:  50               # Print loss every N batches
+  val_interval:  1                # Validate every N epochs
+  save_interval: 5                # Save checkpoint every N epochs
+
+# ── Checkpoints & Output ──────────────────────────────────────────────────────
+checkpoint:
+  dir:            "weights"
+  resume:         ""              # Path to checkpoint to resume from (empty = scratch)
+  best_metric:    "psnr"         # Metric to track for best model (psnr or ssim)
+
+# ── Inference ─────────────────────────────────────────────────────────────────
+inference:
+  weights_path:  "weights/best_model.pth"
+  output_dir:    "restored_outputs"
+  device:        "auto"           # "auto" | "cuda" | "cpu"
+  pad_multiple:  16               # Pad input to multiple of this before inference

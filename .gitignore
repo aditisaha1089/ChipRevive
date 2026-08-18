@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Dataset files (large binaries — do NOT commit)
+data/raw/
+data/test/
+
+# Model weights (~2MB — small enough to commit directly)
+# weights/*.pth  ← intentionally NOT ignored; committed directly
+
+# Training outputs
+weights/train.log
+weights/metrics.csv
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+smoke_test.py
+
+.git-old/
